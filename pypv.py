@@ -120,11 +120,11 @@ def create_process_callback(sdr_sps, audio_sps, presos, postsos):
         
     return callback
 
-passband = 12000
+passband = 8000
 stopband = sdr_nyquist - 1
 presos = signal.iirdesign(passband, stopband, 0.1, 24, fs = sdr_sps, output = 'sos')
-passband = [40, 8000]
-stopband = [10, 10000]
+passband = [50, 10000]
+stopband = [20, 12000]
 postsos = signal.iirdesign(passband, stopband, 0.1, 48, fs = audio_sps, output = 'sos')
 
 def read_sdr():
