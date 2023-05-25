@@ -34,7 +34,7 @@ NYQUIST = SAMPLE_RATE / 2
 BLOCK_SIZE = 2 ** 12
 PITCH_SHIFT = 1
 
-SAMPLE_BUS = queue.Queue() #BLOCK_SIZE * 2)
+SAMPLE_BUS = queue.Queue()
 
 # sig: input vector
 # factor: amount to scale by, e.g. 2 = +1 octave, 0.5 = -1 octave.
@@ -73,7 +73,6 @@ def create_output_callback():
 # number, number, 6d tuple, 6d tuple, sound device -> (ndarray -> None)
 # e.g. SDR sample rate, audio sample rate, SOS pre-filter, SOS post-filter, sound device -> buffer -> None
 def create_process_callback(sdr_sps, audio_sps, presos, postsos):
-    print("making sdr")
     def callback(buffer, context):
         dt = 1.0 / sdr_sps # seconds
         sdr_nyquist = sdr_sps / 2.0
@@ -114,7 +113,6 @@ def create_process_callback(sdr_sps, audio_sps, presos, postsos):
         filt_audio_samples = signal.sosfilt(postsos, audio_samples)
         
         # play
-        # sd.play(10 * filt_audio_samples, audio_sps, blocking = False)
         # output is in filt_audio_samples
         for s in filt_audio_samples:
             SAMPLE_BUS.put(s, block=True)
@@ -129,7 +127,6 @@ passband = [40, 8000]
 stopband = [10, 10000]
 postsos = signal.iirdesign(passband, stopband, 0.1, 48, fs = audio_sps, output = 'sos')
 
-
 def read_sdr():
     sdr.read_samples_async(create_process_callback(sdr_sps, SAMPLE_RATE, presos, postsos), BLOCK_SIZE * np.ceil(sdr_sps / audio_sps))
 
@@ -140,56 +137,11 @@ def write_out():
 
 futures.ThreadPoolExecutor(max_workers=1).submit(read_sdr)
 
-# futures.ThreadPoolExecutor(max_workers=1).submit(write_out)
-
 with sd.OutputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, channels=1, callback=create_output_callback()):
     while True:
         response = input()
         if response in ('', 'Q', 'q'):
             break
         PITCH_SHIFT = float(response)
-    # sd.sleep(5000)
+
 sdr.cancel_read_async()
-# write_out()
-
-# sd.OutputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, channels=1, callback=create_output_callback())
-
-
-# last_in = 1
-# while last_in != 'q':
-#     PITCH_SHIFT = int(last_in)
-#     last_in = input()
-    
-
-'''
-# tests with wave file
-with wave.open('./resources/test_chirp.wav', 'rb') as input:
-    # convert wave file to np 16-bit FP array
-    samples = input.readframes(input.getnframes())
-    samples = np.frombuffer(samples, dtype=np.int16).astype(np.float16) / 2 ** 15
-
-    print(len(samples) / SAMPLE_RATE, len(samples), len(samples) / BLOCK_SIZE)
-
-    # get STFT of time-domain samples
-    f, t, stft = signal.stft(samples, SAMPLE_RATE, window='blackman', nperseg=BLOCK_SIZE, return_onesided=False, noverlap=BLOCK_SIZE*3//4)
-    t_pre = t
-    stft_pre = stft
-    # scale
-    stft = freq_scale_stft(stft, 2)
-
-    # turn back to time-domain samples
-    t, samples_back = signal.istft(stft, SAMPLE_RATE, window='blackman', nperseg=BLOCK_SIZE, input_onesided=False, noverlap=BLOCK_SIZE*3//4)
-    samples_back = (samples_back.real)
-
-    print(len(samples_back) / SAMPLE_RATE, len(samples_back))
-
-    print(stft.shape, stft_pre.shape)
-
-    # play
-    sd.play(samples_back, samplerate=SAMPLE_RATE, blocking=True)
-
-    # write output
-    with wave.open("./resources/test_out.wav", 'wb') as out:
-        out.setparams(input.getparams())
-        out.writeframes((samples_back * 2**15).astype(np.int16))
-'''
