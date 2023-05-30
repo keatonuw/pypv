@@ -3,9 +3,11 @@ import copy
 import scipy.signal as signal
 import concurrent.futures as futures
 
+from consts import *
+
 from rtlsdr import RtlSdr
 
-SDR_SPS = 2*256*256*16
+
 
 class SdrDecoder:
 
