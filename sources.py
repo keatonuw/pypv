@@ -2,12 +2,12 @@ import numpy as np
 import copy
 import scipy.signal as signal
 import concurrent.futures as futures
+import wave
+import queue
 
 from consts import *
 
 from rtlsdr import RtlSdr
-
-
 
 class SdrDecoder:
 
@@ -73,10 +73,22 @@ class SdrDecoder:
         return callback
 
     # start writing to the queue!
-    def start(self, block_size):
+    def start(self):
+        block_size = BLOCK_SIZE * np.ceil(self.sdr_sps / self.audio_sps)
         def read_sdr():
             self.sdr.read_samples_async(self.__getCallback(), block_size)
         futures.ThreadPoolExecutor(max_workers=1).submit(read_sdr)
 
     def stop(self):
         self.sdr.cancel_read_async()
+
+class WaveSource:
+
+    def __init__(self, dest_queue: queue.Queue, file):
+        self.dest_queue = dest_queue
+        self.file = file
+
+    def start(self):
+        with wave.open(self.file, 'r') as w:
+            for s in w:
+                self.dest_queue.put(s)
