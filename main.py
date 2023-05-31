@@ -1,36 +1,69 @@
-import numpy as np
 import queue
-import concurrent.futures as futures
+import sys
 
 from consts import *
 from processors import *
 from sources import *
 from dests import *
 
-sample_bus = queue.Queue() # location to write source's samples to
+def main(sample_bus: queue.Queue, processor: Processor, source: Source, dest: AudioOut):
+    def start(source, callback, dest):
+        source.start()
+        dest.start(callback)
 
-processor = PitchPV(1) # object to use to manipulate the samples
-processor.shift_factor = 1
-# processor = Bypass()
+    def mainloop():
+        while True:
+            response = input()
+            if response in ('', 'Q', 'q'):
+                break
+            processor.control(float(response))
 
-source = SdrDecoder(sample_bus, SAMPLE_RATE) # set up the source
-# source = WaveSource(sample_bus, "./resources/sc-vs-mc.wav")
+        source.stop()
+        dest.stop()
 
-dest = AudioOut(sample_bus, processor) # set up the sink
+    start(source, mainloop, dest)
+    exit(0)
 
-def start(source, callback, dest):
-    source.start()
-    print(sample_bus)
-    dest.start(callback)
+def usage():
+    print("USAGE: python main.py (-s (<filename>|sdr (<freq>)?|in) -p (pitch|bypass))?")
+    exit(1)
 
-def mainloop():
-    while True:
-        response = input()
-        if response in ('', 'Q', 'q'):
-            break
-        processor.shift_factor = float(response)
+if __name__ == "__main__":
+    # -s (<filename>|sdr|in)
+    # -p (pitch|bypass)
+    sample_bus = queue.Queue() # location to write source's samples to
 
-    source.stop()
-    dest.stop()
+    # set up processor
+    if "-p" in sys.argv:
+        idx = sys.argv.index("-p") + 1
+        if sys.argv[idx] == "pitch":
+            processor = PitchPV(1)
+        elif sys.argv[idx] == "bypass":
+            processor = Bypass()
+        else:
+            usage()
+    else:
+        processor = PitchPV(1)
 
-start(source, mainloop, dest)
+    # set up source
+    if "-s" in sys.argv:
+        idx = sys.argv.index("-s") + 1
+        if sys.argv[idx] == "sdr":
+            try:
+                fc = float(sys.argv[idx + 1])
+            except:
+                fc = 94.9
+            source = SdrFIRDemod(sample_bus, SAMPLE_RATE, fc)
+        elif sys.argv[idx] == "in":
+            print("RT Input not implemented")
+            usage()
+        else:
+            source = WaveSource(sample_bus, sys.argv[idx])
+    else:
+        source = SdrFIRDemod(sample_bus, SAMPLE_RATE)
+
+    # set up dest
+    dest = AudioOut(sample_bus, processor) # set up the sink
+
+    print("Starting PYPV. Enter control amounts or 'Q' to quit.")
+    main(sample_bus, processor, source, dest)

@@ -7,6 +7,10 @@ from consts import *
 '''
 This file contains the processor objects used to transform incoming blocks into
 new blocks.
+
+It also contains routines used by these objects.
+
+Currently only pitch shifting is fully implemented.
 '''
 
 PITCH_MODE = 'pitch'
@@ -18,7 +22,8 @@ TIME_MODE = 'time'
 def scale(sig, factor = 2):
     x = np.arange(0, len(sig))
     f = interpolate.PchipInterpolator(x, sig, extrapolate=True)
-    return f(x / factor) * factor #[0] + f(x / factor)[1]
+    # f = interpolate.CubicSpline(x, sig, bc_type='clamped')
+    return f(x / factor) * max(factor, 1 / factor) #[0] + f(x / factor)[1]
 
 # scale, but on an array of stft blocks.
 # stft: input array of STFTs.
@@ -47,16 +52,24 @@ def scale_block(block, pitch_shift = 1, window='hann', overlap=0.75, mode=PITCH_
     stft = scale_stft(stft, pitch_shift, mode == PITCH_MODE)
     t, samples_back = signal.istft(stft, SAMPLE_RATE, window=window, nperseg=FFT_BLOCK_SIZE,
                                 input_onesided=True, noverlap=nop)
-    samples_back = samples_back[:BLOCK_SIZE]
+    samples_back = samples_back[len(samples_back) // 2 - BLOCK_SIZE // 2:len(samples_back) // 2 + BLOCK_SIZE // 2]
     return samples_back.real
 
-class PitchPV:
+class Processor:
+    def process(self, block):
+        pass
 
-    def __init__(self, shift_factor = 1):
+    def control(self, value):
+        pass
+
+class PitchPV(Processor):
+
+    def __init__(self, shift_factor = 1, pre_lp = 20000):
         self.shift_factor = shift_factor
-        self.prev_half = np.zeros(BLOCK_SIZE // 2)
+        self.prev_half = np.zeros(BLOCK_SIZE)
         self.hann = np.hanning(BLOCK_SIZE)
-        fac = (2 * SAMPLE_RATE / 2 / SAMPLE_RATE)
+
+        fac = (2 * pre_lp / SAMPLE_RATE)
         kernel_size = 128
 
         # Zolzer sinc FIR LP
@@ -64,11 +77,14 @@ class PitchPV:
 
     # call this to process a block with the settings of this object
     def process(self, block):
-        scaled = scale_block(np.convolve(block, self.prefir, 'same'), self.shift_factor, mode='pitch')
-        # self.last = block[-FFT_BLOCK_SIZE:]
+        scaled = scale_block(np.convolve(np.append(self.prev_half, block), self.prefir, 'same'), self.shift_factor, mode='pitch')
+        self.prev_half = block
         return scaled
     
-class TimePV:
+    def control(self, value):
+        self.shift_factor = max(value, 0.1)
+    
+class TimePV(Processor):
 
     def __init__(self, stretch_factor = 1):
         self.stretch_factor = stretch_factor
@@ -76,8 +92,14 @@ class TimePV:
     def process(self, block):
         return scale_block(block, self.stretch_factor, mode='time')
     
-class Bypass:
+    def control(self, value):
+        self.stretch_factor = max(value, 0.1)
+    
+class Bypass(Processor):
 
     def process(self, block):
         return block
+    
+    def control(self, value):
+        pass
 
