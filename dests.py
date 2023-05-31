@@ -12,6 +12,7 @@ class AudioOut:
     def __init__(self, source_queue, processor):
         self.processor = processor
         self.source_queue = source_queue
+        self.running = False
 
     def create_output_callback(self):
         # write outdata to output
@@ -20,9 +21,10 @@ class AudioOut:
             outdata[:, 0] = self.processor.process(np.array([self.source_queue.get(block=True) for i in range(BLOCK_SIZE)]))   
         return callback
 
-    def start(self):
+    def start(self, callback):
+        self.running = True
         with sd.OutputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, channels=1, callback=self.create_output_callback()):
-            while True:
-                response = input()
-                if response in ('', 'Q', 'q'):
-                    break
+            callback()
+
+    def stop(self):
+        self.running = False

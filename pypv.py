@@ -194,7 +194,7 @@ stopband = [20, 12000]
 postsos = signal.iirdesign(passband, stopband, 1, 6, fs = audio_sps, output = 'sos')
 
 def read_sdr():
-    sdr.read_samples_async(create_fir_process_callback(sdr_sps, SAMPLE_RATE, 10000, postsos), BLOCK_SIZE * np.ceil(sdr_sps / audio_sps))
+    sdr.read_samples_async(create_fir_process_callback(sdr_sps, SAMPLE_RATE, 70000, postsos), BLOCK_SIZE * np.ceil(sdr_sps / audio_sps))
 
 def write_out():
     with sd.OutputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE, channels=1, 

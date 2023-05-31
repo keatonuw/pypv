@@ -40,9 +40,9 @@ class SdrDecoder:
             abs_signal = np.abs(filt_samples)
             mean_abs_signal = np.mean(abs_signal)
             squelch_mask = abs_signal < (mean_abs_signal / 1.0)
-            squelch_theta = copy(theta)
+            squelch_theta = copy.copy(theta)
             np.putmask(squelch_theta, squelch_mask, 0.0)
-            squelch_samples = copy(filt_samples)
+            squelch_samples = copy.copy(filt_samples)
             np.putmask(squelch_samples, squelch_mask, 0.0)
 
             # find dtheta
@@ -51,7 +51,7 @@ class SdrDecoder:
             dtheta = np.where(abs(dtheta_p0) >= abs(dtheta_pp), dtheta_p0, dtheta_pp)
 
             # clean dtheta
-            cdtheta = copy(dtheta)
+            cdtheta = copy.copy(dtheta)
             spikethresh = 0.5
             # there's got to be a faster way?
             for i in range(1,len(dtheta)-1):
@@ -90,5 +90,8 @@ class WaveSource:
 
     def start(self):
         with wave.open(self.file, 'r') as w:
-            for s in w:
-                self.dest_queue.put(s)
+            print(w.getparams())
+            buf = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+            buf = buf.astype(dtype=np.float32)
+            for s in buf / 2 ** 15:
+                self.dest_queue.put(s, block=True)
