@@ -66,4 +66,4 @@ if __name__ == "__main__":
     dest = AudioOut(sample_bus, processor) # set up the sink
 
     print("Starting PYPV. Enter control amounts or 'Q' to quit.")
-    main(sample_bus, processor, source, dest)
+    main(processor, source, dest)
